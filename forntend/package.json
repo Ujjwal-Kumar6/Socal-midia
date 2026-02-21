@@ -10,10 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@getbrevo/brevo": "^2.2.0",
     "@reduxjs/toolkit": "^2.9.0",
     "@tailwindcss/vite": "^4.1.18",
     "axios": "^1.12.2",
-    "@getbrevo/brevo": "^2.2.0",
     "cloudinary": "^2.7.0",
     "date-fns": "^4.1.0",
     "react": "^19.1.1",
@@ -23,6 +23,7 @@
     "react-redux": "^9.2.0",
     "react-router-dom": "^7.9.3",
     "react-spinners": "^0.17.0",
+    "simple-peer": "^9.11.1",
     "socket.io-client": "^4.8.3",
     "tailwindcss": "^4.1.18"
   },

@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { MdOutlineKeyboardBackspace } from 'react-icons/md';
 import { IoSend } from 'react-icons/io5';
 import { HiOutlinePhotograph } from 'react-icons/hi';
+import { MdVideoCall } from 'react-icons/md';
 import { useNavigate } from 'react-router-dom';
 import dp from '../assets/dp.jpg';
 import axios from 'axios';
@@ -11,6 +12,7 @@ import { BiLoader } from 'react-icons/bi';
 import { setMessages, clearSelectedUser } from '../redux/massageSlice';
 import SenderMassage from '../componesnsts/SenderMassage';
 import ReciverMassage from '../componesnsts/ReciverMassage';
+import VideoCall from '../componesnsts/VideoCall';
 
 function Conv() {
   const { selectedUser, messages } = useSelector(state => state.message);
@@ -26,6 +28,9 @@ function Conv() {
   const [backendImage, setBackendImage] = useState(null);
   const [preview, setPreview] = useState(null);
   const bottomRef = useRef(null);
+
+  // ── Video call state ──
+  const [showVideoCall, setShowVideoCall] = useState(false);
 
   const isOnline = onlineUser?.includes(selectedUser?._id);
 
@@ -158,16 +163,13 @@ function Conv() {
     };
   }, [sockets, dispatch, messages]);
 
-  // NEW: Socket listener for conversation deletion
+  // Socket listener for conversation deletion
   useEffect(() => {
     if (!sockets) return;
 
     const handleConversationDeleted = ({ conversationId, otherUserId }) => {
-      // If this conversation was deleted and we're viewing it
       if (selectedUser?._id === otherUserId) {
-        // Clear messages
         dispatch(setMessages([]));
-        // Navigate back to messages list
         navigate(-1);
       }
     };
@@ -182,14 +184,13 @@ function Conv() {
   return (
     <div className="w-full h-screen bg-black text-white flex flex-col">
 
+      {/* ── Header ── */}
       <div className="fixed top-0 left-0 w-full h-[60px] flex items-center gap-3 px-4 border-b border-gray-800 bg-black z-50">
         <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-gray-800">
           <MdOutlineKeyboardBackspace size={24} />
         </button>
 
-        <div className="relative cursor-pointer" onClick={
-         () => navigate(`/profile/${selectedUser?.userName}`)
-        }>
+        <div className="relative cursor-pointer" onClick={() => navigate(`/profile/${selectedUser?.userName}`)}>
           <img
             src={selectedUser?.profilePic || dp}
             className="w-9 h-9 rounded-full object-cover"
@@ -200,12 +201,22 @@ function Conv() {
           )}
         </div>
 
-        <div className='cursor-pointer' onClick={() => navigate(`/profile/${selectedUser?.userName}`)}>
+        <div className='cursor-pointer flex-1' onClick={() => navigate(`/profile/${selectedUser?.userName}`)}>
           <p className="text-sm font-semibold">{selectedUser?.userName}</p>
           <p className="text-xs text-gray-400">{isOnline ? 'Online' : 'Offline'}</p>
         </div>
+
+        {/* ── Video Call Button ── */}
+        <button
+          onClick={() => setShowVideoCall(true)}
+          className="p-2 rounded-full hover:bg-gray-800 text-purple-400 hover:text-purple-300 transition-colors"
+          title="Start video call"
+        >
+          <MdVideoCall size={28} />
+        </button>
       </div>
 
+      {/* ── Messages ── */}
       <div className="flex-1 pt-[70px] pb-[140px] px-4 overflow-y-auto">
         {messagesLoading ? (
           <div className="flex justify-center items-center h-full">
@@ -241,6 +252,7 @@ function Conv() {
         </div>
       )}
 
+      {/* ── Message input ── */}
       <div className="fixed bottom-0 left-0 w-full border-t border-gray-800 bg-black px-4 py-3">
         <form onSubmit={handleSend} className="flex items-center gap-3">
           <label className="cursor-pointer">
@@ -271,6 +283,14 @@ function Conv() {
           </button>
         </form>
       </div>
+
+      {/* ── VideoCall component ── */}
+      {showVideoCall && (
+        <VideoCall
+          targetUser={selectedUser}
+          onClose={() => setShowVideoCall(false)}
+        />
+      )}
 
     </div>
   );
