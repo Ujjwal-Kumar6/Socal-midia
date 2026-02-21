@@ -214,7 +214,7 @@ function Profile() {
       </div>
 
       {/* STATS */}
-      <div className="flex justify-center gap-14 mt-8 pb-6 border-b border-gray-800">
+      <div className="flex justify-center gap-10 mt-8 pb-6 border-b border-gray-800">
         {[
           { label: "Posts", value: userPosts.length },
           { label: "Loops", value: userLoops.length },

@@ -1,260 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
-import SimplePeer from 'simple-peer';
+import SimplePeerModule from 'simple-peer/simplepeer.min.js';
+import {
+  Video,
+  VideoOff,
+  Mic,
+  MicOff,
+  PhoneOff,
+  Phone,
+} from 'lucide-react';
 
-// ─── STYLES ──────────────────────────────────────────────────────────────────
-const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&display=swap');
-
-  .vc-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.85);
-    backdrop-filter: blur(12px);
-    z-index: 9999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: 'Syne', sans-serif;
-  }
-
-  .vc-modal {
-    background: #0a0a0a;
-    border: 1px solid #1f1f1f;
-    border-radius: 24px;
-    width: 90%;
-    max-width: 860px;
-    overflow: hidden;
-    box-shadow: 0 40px 80px rgba(0,0,0,0.6);
-    position: relative;
-  }
-
-  .vc-videos {
-    position: relative;
-    width: 100%;
-    background: #050505;
-    aspect-ratio: 16/9;
-    overflow: hidden;
-  }
-
-  .vc-remote {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-
-  .vc-local {
-    position: absolute;
-    bottom: 16px;
-    right: 16px;
-    width: 130px;
-    height: 90px;
-    object-fit: cover;
-    border-radius: 12px;
-    border: 2px solid #222;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-    z-index: 2;
-  }
-
-  .vc-placeholder {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    color: #333;
-  }
-
-  .vc-avatar-ring {
-    width: 88px;
-    height: 88px;
-    border-radius: 50%;
-    border: 2px solid #222;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    animation: vc-pulse 2s infinite;
-  }
-
-  @keyframes vc-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(99,102,241,0.3); }
-    50%       { box-shadow: 0 0 0 12px rgba(99,102,241,0); }
-  }
-
-  .vc-avatar-img {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    object-fit: cover;
-  }
-
-  .vc-avatar-fallback {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 32px;
-    font-weight: 700;
-    color: white;
-  }
-
-  .vc-status-text {
-    font-size: 13px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: #444;
-  }
-
-  .vc-info-bar {
-    padding: 14px 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-top: 1px solid #111;
-  }
-
-  .vc-name {
-    font-size: 15px;
-    font-weight: 700;
-    color: #e5e5e5;
-    letter-spacing: 0.02em;
-  }
-
-  .vc-timer {
-    font-size: 13px;
-    color: #555;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0.05em;
-  }
-
-  .vc-controls {
-    padding: 16px 20px 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 14px;
-    border-top: 1px solid #111;
-  }
-
-  .vc-btn {
-    width: 52px;
-    height: 52px;
-    border-radius: 50%;
-    border: none;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 20px;
-    transition: all 0.2s ease;
-    outline: none;
-  }
-
-  .vc-btn:hover { transform: scale(1.08); }
-  .vc-btn:active { transform: scale(0.95); }
-
-  .vc-btn-mute  { background: #1a1a1a; color: #ccc; border: 1px solid #2a2a2a; }
-  .vc-btn-mute.active  { background: #6366f1; color: white; border-color: #6366f1; }
-  .vc-btn-video { background: #1a1a1a; color: #ccc; border: 1px solid #2a2a2a; }
-  .vc-btn-video.active { background: #6366f1; color: white; border-color: #6366f1; }
-  .vc-btn-end   { background: #ef4444; color: white; width: 60px; height: 60px; font-size: 22px; }
-  .vc-btn-end:hover { background: #dc2626; }
-
-  /* ── Incoming call toast ── */
-  .vc-incoming {
-    position: fixed;
-    bottom: 28px;
-    right: 28px;
-    z-index: 10000;
-    background: #111;
-    border: 1px solid #222;
-    border-radius: 20px;
-    padding: 18px 20px;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-    font-family: 'Syne', sans-serif;
-    animation: vc-slide-up 0.3s ease;
-    min-width: 280px;
-  }
-
-  @keyframes vc-slide-up {
-    from { transform: translateY(20px); opacity: 0; }
-    to   { transform: translateY(0);    opacity: 1; }
-  }
-
-  .vc-incoming-avatar {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    object-fit: cover;
-    flex-shrink: 0;
-  }
-
-  .vc-incoming-avatar-fallback {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
-    font-weight: 700;
-    color: white;
-    flex-shrink: 0;
-  }
-
-  .vc-incoming-info { flex: 1; }
-  .vc-incoming-label {
-    font-size: 11px;
-    color: #555;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    margin-bottom: 3px;
-  }
-  .vc-incoming-name {
-    font-size: 15px;
-    font-weight: 700;
-    color: #e5e5e5;
-  }
-
-  .vc-incoming-actions { display: flex; gap: 8px; }
-
-  .vc-btn-answer {
-    width: 44px; height: 44px;
-    border-radius: 50%;
-    border: none;
-    background: #22c55e;
-    color: white;
-    font-size: 18px;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.2s;
-  }
-  .vc-btn-answer:hover { background: #16a34a; transform: scale(1.08); }
-
-  .vc-btn-decline {
-    width: 44px; height: 44px;
-    border-radius: 50%;
-    border: none;
-    background: #ef4444;
-    color: white;
-    font-size: 18px;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.2s;
-  }
-  .vc-btn-decline:hover { background: #dc2626; transform: scale(1.08); }
-`;
+const SimplePeer = SimplePeerModule.default || SimplePeerModule;
 
 // ─── TIMER HOOK ───────────────────────────────────────────────────────────────
 function useCallTimer(active) {
@@ -269,31 +25,56 @@ function useCallTimer(active) {
   return `${m}:${s}`;
 }
 
-// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
+// ─── AVATAR ───────────────────────────────────────────────────────────────────
+function Avatar({ src, name, size = 'lg' }) {
+  const sizes = {
+    sm: 'w-12 h-12 text-lg',
+    lg: 'w-20 h-20 text-3xl',
+  };
+  if (src) return (
+    <img src={src} alt={name}
+      className={`${sizes[size]} rounded-full object-cover border-2 border-white/10`} />
+  );
+  return (
+    <div className={`${sizes[size]} rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-bold text-white`}>
+      {name?.[0]?.toUpperCase()}
+    </div>
+  );
+}
+
+// ─── CONTROL BUTTON ──────────────────────────────────────────────────────────
+function CtrlBtn({ onClick, active, danger, children, title }) {
+  let cls = 'w-13 h-13 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95 ';
+  if (danger)       cls += 'bg-red-500 hover:bg-red-600 text-white w-16 h-16';
+  else if (active)  cls += 'bg-indigo-500 text-white border border-indigo-400';
+  else              cls += 'bg-white/10 text-white border border-white/10 hover:bg-white/20';
+  return (
+    <button onClick={onClick} title={title}
+      className={cls} style={{ width: danger ? 64 : 52, height: danger ? 64 : 52 }}>
+      {children}
+    </button>
+  );
+}
+
+// ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 /**
- * VideoCall
+ * VideoCall — two ways to use:
  *
- * Props:
- *   targetUser  — the user object you want to call: { _id, userName, profilePicture }
- *   onClose     — callback to unmount / hide this component
+ * 1. OUTGOING (from Conv.jsx):
+ *    <VideoCall targetUser={selectedUser} onClose={() => setShowCall(false)} />
  *
- * Usage (e.g. inside Conv.jsx or Massage.jsx):
- *   const [showCall, setShowCall] = useState(false);
- *   {showCall && <VideoCall targetUser={otherUser} onClose={() => setShowCall(false)} />}
+ * 2. INCOMING (from App.jsx):
+ *    <VideoCall incomingCallData={{ from, signal, callerInfo }} onClose={...} />
  */
-export default function VideoCall({ targetUser, onClose }) {
-  // ── Redux ──
+export default function VideoCall({ targetUser, incomingCallData, onClose }) {
   const { sockets: socket } = useSelector(state => state.socket);
   const { userData }        = useSelector(state => state.user);
 
-  // ── State ──
-  const [callState, setCallState]       = useState('idle');   // idle | calling | active | incoming
-  const [incomingData, setIncomingData] = useState(null);     // { from, signal, callerInfo }
-  const [isMuted, setIsMuted]           = useState(false);
-  const [isVideoOff, setIsVideoOff]     = useState(false);
+  const [callState, setCallState]             = useState(incomingCallData ? 'incoming' : 'idle');
+  const [isMuted, setIsMuted]                 = useState(false);
+  const [isVideoOff, setIsVideoOff]           = useState(false);
   const [remoteConnected, setRemoteConnected] = useState(false);
 
-  // ── Refs ──
   const myVideoRef     = useRef(null);
   const remoteVideoRef = useRef(null);
   const peerRef        = useRef(null);
@@ -301,44 +82,22 @@ export default function VideoCall({ targetUser, onClose }) {
 
   const timer = useCallTimer(callState === 'active');
 
-  // ── Inject styles once ──
-  useEffect(() => {
-    if (document.getElementById('vc-styles')) return;
-    const tag = document.createElement('style');
-    tag.id = 'vc-styles';
-    tag.textContent = styles;
-    document.head.appendChild(tag);
-    return () => tag.remove();
-  }, []);
-
   // ── Socket listeners ──
   useEffect(() => {
     if (!socket) return;
-
-    // Someone is calling US
-    socket.on('incoming-call', ({ from, signal, callerInfo }) => {
-      setIncomingData({ from, signal, callerInfo });
-      setCallState('incoming');
-    });
-
-    // Our call was accepted
-    socket.on('call-accepted', (signal) => {
-      peerRef.current?.signal(signal);
-    });
-
-    // Other side hung up
-    socket.on('call-ended', () => {
-      cleanUp();
-    });
-
+    socket.on('call-accepted', (signal) => peerRef.current?.signal(signal));
+    socket.on('call-ended', () => cleanUp(false));
     return () => {
-      socket.off('incoming-call');
       socket.off('call-accepted');
       socket.off('call-ended');
     };
   }, [socket]);
 
-  // ── Get user media helper ──
+  // ── Auto-start outgoing call ──
+  useEffect(() => {
+    if (!incomingCallData && targetUser) startCall();
+  }, []);
+
   const getStream = async () => {
     const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
     streamRef.current = stream;
@@ -346,16 +105,12 @@ export default function VideoCall({ targetUser, onClose }) {
     return stream;
   };
 
-  // ── Start a call ──
   const startCall = async () => {
     if (!socket || !targetUser) return;
     setCallState('calling');
-
     try {
       const stream = await getStream();
-
       const peer = new SimplePeer({ initiator: true, trickle: false, stream });
-
       peer.on('signal', (signal) => {
         socket.emit('call-user', {
           to: targetUser._id,
@@ -364,55 +119,44 @@ export default function VideoCall({ targetUser, onClose }) {
           callerInfo: { userName: userData.userName, profilePicture: userData.profilePicture }
         });
       });
-
       peer.on('stream', (remoteStream) => {
         if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream;
         setRemoteConnected(true);
         setCallState('active');
       });
-
-      peer.on('error', (err) => { console.error('Peer error', err); cleanUp(); });
-
+      peer.on('error', () => cleanUp(false));
       peerRef.current = peer;
     } catch (err) {
-      console.error('Could not get camera/mic', err);
-      setCallState('idle');
+      console.error('Camera/mic error:', err);
+      cleanUp(false);
     }
   };
 
-  // ── Answer incoming call ──
   const answerCall = async () => {
-    if (!socket || !incomingData) return;
-
+    if (!socket || !incomingCallData) return;
     try {
       const stream = await getStream();
-
       const peer = new SimplePeer({ initiator: false, trickle: false, stream });
-
       peer.on('signal', (signal) => {
-        socket.emit('answer-call', { to: incomingData.from, signal });
+        socket.emit('answer-call', { to: incomingCallData.from, signal });
       });
-
       peer.on('stream', (remoteStream) => {
         if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream;
         setRemoteConnected(true);
         setCallState('active');
       });
-
-      peer.on('error', (err) => { console.error('Peer error', err); cleanUp(); });
-
-      peer.signal(incomingData.signal);
+      peer.on('error', () => cleanUp(false));
+      peer.signal(incomingCallData.signal);
       peerRef.current = peer;
     } catch (err) {
-      console.error('Could not get camera/mic', err);
-      setCallState('idle');
+      console.error('Camera/mic error:', err);
+      cleanUp(false);
     }
   };
 
-  // ── End / clean up ──
-  const cleanUp = (notifyRemote = false) => {
+  const cleanUp = (notifyRemote = true) => {
     if (notifyRemote && socket) {
-      const remoteId = callState === 'incoming' ? incomingData?.from : targetUser?._id;
+      const remoteId = incomingCallData ? incomingCallData.from : targetUser?._id;
       if (remoteId) socket.emit('end-call', { to: remoteId });
     }
     peerRef.current?.destroy();
@@ -423,135 +167,115 @@ export default function VideoCall({ targetUser, onClose }) {
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
     setCallState('idle');
     setRemoteConnected(false);
-    setIncomingData(null);
-    setIsMuted(false);
-    setIsVideoOff(false);
     onClose?.();
   };
 
-  const hangUp = () => cleanUp(true);
-
-  // ── Toggle mic ──
   const toggleMute = () => {
-    if (!streamRef.current) return;
-    streamRef.current.getAudioTracks().forEach(t => { t.enabled = !t.enabled; });
+    streamRef.current?.getAudioTracks().forEach(t => { t.enabled = !t.enabled; });
     setIsMuted(m => !m);
   };
 
-  // ── Toggle camera ──
   const toggleVideo = () => {
-    if (!streamRef.current) return;
-    streamRef.current.getVideoTracks().forEach(t => { t.enabled = !t.enabled; });
+    streamRef.current?.getVideoTracks().forEach(t => { t.enabled = !t.enabled; });
     setIsVideoOff(v => !v);
   };
 
-  // ── Caller/callee info helpers ──
-  const remoteUser    = callState === 'incoming' ? incomingData?.callerInfo : targetUser;
-  const remoteName    = remoteUser?.userName   || 'User';
-  const remoteAvatar  = remoteUser?.profilePicture;
-  const statusLabel   = callState === 'calling' ? 'Calling…' : callState === 'active' ? 'Connected' : '';
+  const remoteInfo   = incomingCallData?.callerInfo || targetUser;
+  const remoteName   = remoteInfo?.userName || 'User';
+  const remoteAvatar = remoteInfo?.profilePicture;
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // RENDER: Incoming call toast (shown even when overlay is closed)
-  // ─────────────────────────────────────────────────────────────────────────────
+  // ── INCOMING CALL TOAST ──────────────────────────────────────────────────────
   if (callState === 'incoming') {
     return (
-      <div className="vc-incoming">
-        {remoteAvatar
-          ? <img src={remoteAvatar} className="vc-incoming-avatar" alt={remoteName} />
-          : <div className="vc-incoming-avatar-fallback">{remoteName[0].toUpperCase()}</div>
-        }
-        <div className="vc-incoming-info">
-          <div className="vc-incoming-label">Incoming video call</div>
-          <div className="vc-incoming-name">{remoteName}</div>
+      <div className="fixed bottom-6 right-6 z-[10000] bg-[#111] border border-white/10 rounded-2xl p-4 flex items-center gap-4 shadow-2xl min-w-[280px] animate-[slideUp_0.3s_ease]"
+        style={{ animation: 'slideUp 0.3s ease' }}>
+
+        <style>{`@keyframes slideUp { from { transform: translateY(16px); opacity:0 } to { transform: translateY(0); opacity:1 } }`}</style>
+
+        <Avatar src={remoteAvatar} name={remoteName} size="sm" />
+
+        <div className="flex-1">
+          <p className="text-[11px] uppercase tracking-widest text-white/30 mb-0.5">Incoming video call</p>
+          <p className="text-white font-semibold text-sm">{remoteName}</p>
         </div>
-        <div className="vc-incoming-actions">
-          <button className="vc-btn-answer"  onClick={answerCall} title="Answer">📹</button>
-          <button className="vc-btn-decline" onClick={hangUp}     title="Decline">📵</button>
+
+        <div className="flex gap-2">
+          {/* Answer */}
+          <button onClick={answerCall}
+            className="w-11 h-11 rounded-full bg-green-500 hover:bg-green-400 flex items-center justify-center text-white transition-all hover:scale-110 active:scale-95">
+            <Phone size={18} />
+          </button>
+          {/* Decline */}
+          <button onClick={() => cleanUp(true)}
+            className="w-11 h-11 rounded-full bg-red-500 hover:bg-red-400 flex items-center justify-center text-white transition-all hover:scale-110 active:scale-95">
+            <PhoneOff size={18} />
+          </button>
         </div>
       </div>
     );
   }
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // RENDER: Main call modal
-  // ─────────────────────────────────────────────────────────────────────────────
+  // ── ACTIVE / CALLING MODAL ───────────────────────────────────────────────────
   return (
-    <div className="vc-overlay">
-      <div className="vc-modal">
+    <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-xl flex items-center justify-center">
+      <div className="bg-[#0a0a0a] border border-white/10 rounded-3xl w-[90%] max-w-3xl overflow-hidden shadow-2xl">
 
-        {/* ── Video area ── */}
-        <div className="vc-videos">
-          {/* Remote video — shown once connected */}
+        {/* Video area */}
+        <div className="relative w-full bg-black aspect-video overflow-hidden">
+
+          {/* Remote video */}
           <video
             ref={remoteVideoRef}
-            autoPlay
-            playsInline
-            className="vc-remote"
+            autoPlay playsInline
+            className="w-full h-full object-cover"
             style={{ display: remoteConnected ? 'block' : 'none' }}
           />
 
-          {/* Placeholder while waiting */}
+          {/* Placeholder while connecting */}
           {!remoteConnected && (
-            <div className="vc-placeholder">
-              <div className="vc-avatar-ring">
-                {remoteAvatar
-                  ? <img src={remoteAvatar} className="vc-avatar-img" alt={remoteName} />
-                  : <div className="vc-avatar-fallback">{remoteName[0].toUpperCase()}</div>
-                }
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+              <div className="rounded-full p-1 border-2 border-white/10 animate-pulse">
+                <Avatar src={remoteAvatar} name={remoteName} size="lg" />
               </div>
-              <span className="vc-status-text">
+              <p className="text-white/30 text-xs uppercase tracking-widest">
                 {callState === 'calling' ? 'Calling…' : 'Connecting…'}
-              </span>
+              </p>
             </div>
           )}
 
-          {/* Local (my) video — small picture-in-picture */}
+          {/* My video — picture in picture */}
           <video
             ref={myVideoRef}
-            autoPlay
-            muted
-            playsInline
-            className="vc-local"
-            style={{ display: streamRef.current ? 'block' : 'none' }}
+            autoPlay muted playsInline
+            className="absolute bottom-3 right-3 w-32 h-22 rounded-xl object-cover border-2 border-white/10 shadow-lg"
+            style={{ height: 90 }}
           />
         </div>
 
-        {/* ── Info bar ── */}
-        <div className="vc-info-bar">
-          <span className="vc-name">{remoteName}</span>
-          <span className="vc-timer">
-            {callState === 'active' ? timer : statusLabel}
+        {/* Info bar */}
+        <div className="flex items-center justify-between px-5 py-3 border-t border-white/5">
+          <span className="text-white font-semibold text-sm">{remoteName}</span>
+          <span className="text-white/30 text-xs font-mono tracking-wider">
+            {callState === 'active' ? timer : callState === 'calling' ? 'Calling…' : 'Connecting…'}
           </span>
         </div>
 
-        {/* ── Controls ── */}
-        <div className="vc-controls">
-          <button
-            className={`vc-btn vc-btn-mute ${isMuted ? 'active' : ''}`}
-            onClick={toggleMute}
-            title={isMuted ? 'Unmute' : 'Mute'}
-          >
-            {isMuted ? '🔇' : '🎙️'}
-          </button>
+        {/* Controls */}
+        <div className="flex items-center justify-center gap-4 px-5 py-4 border-t border-white/5">
 
-          <button
-            className={`vc-btn vc-btn-video ${isVideoOff ? 'active' : ''}`}
-            onClick={toggleVideo}
-            title={isVideoOff ? 'Turn camera on' : 'Turn camera off'}
-          >
-            {isVideoOff ? '📵' : '📹'}
-          </button>
+          <CtrlBtn onClick={toggleMute} active={isMuted} title={isMuted ? 'Unmute' : 'Mute'}>
+            {isMuted ? <MicOff size={20} /> : <Mic size={20} />}
+          </CtrlBtn>
 
-          <button
-            className="vc-btn vc-btn-end"
-            onClick={callState === 'idle' ? startCall : hangUp}
-            title={callState === 'idle' ? 'Start Call' : 'End Call'}
-          >
-            {callState === 'idle' ? '📹' : '📵'}
-          </button>
+          <CtrlBtn onClick={toggleVideo} active={isVideoOff} title={isVideoOff ? 'Camera on' : 'Camera off'}>
+            {isVideoOff ? <VideoOff size={20} /> : <Video size={20} />}
+          </CtrlBtn>
+
+          <CtrlBtn onClick={() => cleanUp(true)} danger title="End call">
+            <PhoneOff size={22} />
+          </CtrlBtn>
+
         </div>
-
       </div>
     </div>
   );
