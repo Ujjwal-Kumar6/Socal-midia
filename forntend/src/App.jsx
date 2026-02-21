@@ -27,8 +27,7 @@ import NotFound from './pages/NotFound';
 import getAllNotification from './hooks/getAllNotification';
 import Notification from './pages/Notification';
 import { setNotification } from './redux/userSlice';
-import VideoCall from './pages/VidioCall';
-
+import VideoCall from './pages/VidioCall.jsx';
 
 export const url = "https://vybe-backend-8yqs.onrender.com";
 function App() {
