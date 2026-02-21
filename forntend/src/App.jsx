@@ -27,6 +27,7 @@ import NotFound from './pages/NotFound';
 import getAllNotification from './hooks/getAllNotification';
 import Notification from './pages/Notification';
 import { setNotification } from './redux/userSlice';
+import VideoCall from './pages/VidioCall';
 
 
 export const url = "https://vybe-backend-8yqs.onrender.com";
@@ -94,6 +95,7 @@ function App() {
       <Route path='/conv' element={userData ? <Conv /> : <Navigate to="/singin" replace />}/>
       <Route path="/search" element={userData ? <Surch /> : <Navigate to="/singin" replace />}/>
       <Route path="/notification" element={userData ? <Notification /> : <Navigate to="/singin" replace />}/>
+      <Route path="/video-call" element={userData ? <VideoCall /> : <Navigate to="/singin" replace />}/>
       <Route path="*" element={userData ? <NotFound /> : <Navigate to="/singin" replace />}/>
     </Routes>
   )
