@@ -12,7 +12,7 @@ import { BiLoader } from 'react-icons/bi';
 import { setMessages, clearSelectedUser } from '../redux/massageSlice';
 import SenderMassage from '../componesnsts/SenderMassage';
 import ReciverMassage from '../componesnsts/ReciverMassage';
-import VideoCall from '.VidioCall.jsx';
+import VideoCall from './VidioCall.jsx';
 
 function Conv() {
   const { selectedUser, messages } = useSelector(state => state.message);
