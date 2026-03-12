@@ -34,6 +34,7 @@ import { setNotification } from "./redux/userSlice";
 export const url = "https://vybe-backend-8yqs.onrender.com";
 
 function App() {
+
   const dispatch = useDispatch();
 
   const { userData, notification } = useSelector((state) => state.user);
@@ -43,20 +44,22 @@ function App() {
 
   useGetCurrentUser();
 
+  /* -------- HOOKS MUST BE AT TOP LEVEL -------- */
+
+  useMyStory();
+
   /* -------- LOAD APP DATA -------- */
 
   useEffect(() => {
     if (!userData) return;
 
-    Promise.all([
-      getSuggestedUser(),
-      useMyStory(),
-      getAllStory(),
-      getAllPost(),
-      getAllLoop(),
-      getPriviusUsers(),
-      getAllNotification(),
-    ]);
+    getSuggestedUser();
+    getAllStory();
+    getAllPost();
+    getAllLoop();
+    getPriviusUsers();
+    getAllNotification();
+
   }, [userData]);
 
   /* -------- SOCKET CONNECTION -------- */
@@ -93,6 +96,7 @@ function App() {
 
   return (
     <Routes>
+
       <Route path="/" element={userData ? <Home /> : <Navigate to="/singin" replace />} />
 
       <Route path="/singup" element={!userData ? <SingUp /> : <Navigate to="/" replace />} />
@@ -122,6 +126,7 @@ function App() {
       <Route path="/video-call" element={userData ? <VideoCall /> : <Navigate to="/singin" replace />} />
 
       <Route path="*" element={userData ? <NotFound /> : <Navigate to="/singin" replace />} />
+
     </Routes>
   );
 }
