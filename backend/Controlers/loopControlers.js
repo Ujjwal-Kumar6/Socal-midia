@@ -1,12 +1,13 @@
 import User from "../Module/userModle.js";
 import Loop from "../Module/loopModle.js";
 import uplodOnCloudnery from "../confige/cloudnery.js";
-import { io,getSocketId } from "../socket.js";
+import { io, getSocketId } from "../socket.js";
 import Notification from "../Module/notificationModle.js";
 
 export const uplodLoop = async (req, res) => {
     try {
         const { caption } = req.body;
+
         if (!req.file) {
             return res.status(400).json({ message: "media is required" });
         }
@@ -19,26 +20,30 @@ export const uplodLoop = async (req, res) => {
             author: req.userId
         });
 
-        await User.findByIdAndUpdate(req.userId, { $push: { loops: loop._id } });
+        await User.findByIdAndUpdate(req.userId, {
+            $push: { loops: loop._id }
+        });
 
         const populateLoop = await Loop.findById(loop._id)
             .populate("author", "name userName profilePic");
 
         return res.status(201).json(populateLoop);
+
     } catch (error) {
-        console.error("Uplod Loop error:", error);
-        return res.status(500).json({ message: `Uplod Loop error: ${error.message}` });
+        console.error("Upload Loop error:", error);
+        return res.status(500).json({ message: `Upload Loop error: ${error.message}` });
     }
 };
 
 export const getAllLoop = async (req, res) => {
     try {
         const loop = await Loop.find({})
-            .sort({ createdAt: -1 }) // newest first
+            .sort({ createdAt: -1 })
             .populate("author", "name userName profilePic")
             .populate("comments.author", "name userName profilePic");
 
         return res.status(200).json(loop);
+
     } catch (error) {
         console.error("Get all Loop error:", error);
         return res.status(500).json({ message: `Get all Loop error: ${error.message}` });
@@ -48,170 +53,215 @@ export const getAllLoop = async (req, res) => {
 export const like = async (req, res) => {
     try {
         const loopId = req.params.loopId;
+
         const loop = await Loop.findById(loopId);
+
         if (!loop) {
-            return res.status(400).json({ message: 'Loop Not found or already deleted' });
+            return res.status(400).json({ message: "Loop Not found or already deleted" });
         }
 
-        const alreadyLike = loop.likes.some(id => id.toString() == req.userId.toString());
+        const alreadyLike = loop.likes.some(
+            id => id.toString() === req.userId.toString()
+        );
+
         if (alreadyLike) {
-            loop.likes = loop.likes.filter(id => id.toString() != req.userId.toString());
+            loop.likes = loop.likes.filter(
+                id => id.toString() !== req.userId.toString()
+            );
         } else {
+
             loop.likes.push(req.userId);
-            if (loop.author._id != req.userId){
+
+            if (loop.author.toString() !== req.userId.toString()) {
+
                 const notification = await Notification.create({
                     sender: req.userId,
-                    reciver: loop.author._id,
+                    receiver: loop.author,
                     type: "like",
                     message: "liked your loop",
                     loop: loop._id
                 });
-                const populatedNotification = await Notification.findById(notification._id).populate("sender reciver loop");
-                const reciverSocketId = getSocketId(loop.author._id);
-                if (reciverSocketId) {
-                    io.to(reciverSocketId).emit("newNotification", populatedNotification);
-                } else {
-                    console.log("reciver socket ID not found");
+
+                const populatedNotification =
+                    await Notification.findById(notification._id)
+                        .populate("sender receiver loop");
+
+                const receiverSocketId = getSocketId(loop.author);
+
+                if (receiverSocketId) {
+                    io.to(receiverSocketId).emit(
+                        "newNotification",
+                        populatedNotification
+                    );
                 }
             }
         }
 
         await loop.save();
+
         await loop.populate("author", "name userName profilePic");
 
-        // ✅ FIXED: Changed 'post.likes' to 'loop.likes'
-        io.emit("likeLoop", { 
+        io.emit("likeLoop", {
             loopId: loop._id,
             likes: loop.likes
         });
 
         return res.status(200).json(loop);
+
     } catch (error) {
-        console.error("Liked error:", error);
-        return res.status(500).json({ message: `Liked error: ${error.message}` });
+        console.error("Like error:", error);
+        return res.status(500).json({ message: `Like error: ${error.message}` });
     }
 };
 
-try {
-    const { message } = req.body;
-    const loopId = req.params.loopId;
+export const commentLoop = async (req, res) => {
+    try {
 
-    if (!message?.trim()) {
-        return res.status(400).json({ message: "Comment message is required" });
-    }
+        const { message } = req.body;
+        const loopId = req.params.loopId;
 
-    const loop = await Loop.findById(loopId);
-    if (!loop) {
-        return res.status(400).json({ message: 'Loop Not found or already deleted' });
-    }
+        if (!message?.trim()) {
+            return res.status(400).json({
+                message: "Comment message is required"
+            });
+        }
 
-    loop.comments.push({
-        author: req.userId,
-        message,
-        createdAt: new Date()
-    });
+        const loop = await Loop.findById(loopId);
 
-    if (loop.author._id.toString() !== req.userId.toString()) {
-        const notification = await Notification.create({
-            sender: req.userId,
-            receiver: loop.author._id,
-            type: "comment",
-            message: "commented on your loop",
-            loop: loop._id
+        if (!loop) {
+            return res.status(400).json({
+                message: "Loop Not found or already deleted"
+            });
+        }
+
+        loop.comments.push({
+            author: req.userId,
+            message,
+            createdAt: new Date()
         });
 
-        const populatedNotification = await Notification.findById(notification._id)
-            .populate("sender receiver loop");
+        if (loop.author.toString() !== req.userId.toString()) {
 
-        const receiverSocketId = getSocketId(loop.author._id);
-        if (receiverSocketId) {
-            io.to(receiverSocketId).emit("newNotification", populatedNotification);
-        } else {
-            console.log("Receiver socket ID not found");
+            const notification = await Notification.create({
+                sender: req.userId,
+                receiver: loop.author,
+                type: "comment",
+                message: "commented on your loop",
+                loop: loop._id
+            });
+
+            const populatedNotification =
+                await Notification.findById(notification._id)
+                    .populate("sender receiver loop");
+
+            const receiverSocketId = getSocketId(loop.author);
+
+            if (receiverSocketId) {
+                io.to(receiverSocketId).emit(
+                    "newNotification",
+                    populatedNotification
+                );
+            }
         }
+
+        await loop.save();
+
+        await loop.populate("author", "name userName profilePic");
+        await loop.populate("comments.author", "name userName profilePic");
+
+        io.emit("commentLoop", {
+            loopId: loop._id,
+            comments: loop.comments
+        });
+
+        return res.status(200).json(loop);
+
+    } catch (error) {
+        console.error("Comment error:", error);
+        return res.status(500).json({
+            message: `Comment error: ${error.message}`
+        });
     }
-
-    await loop.save();
-    await loop.populate("author", "name userName profilePic");
-    await loop.populate("comments.author", "name userName profilePic");
-
-    io.emit("commentLoop", {
-        loopId: loop._id,
-        comments: loop.comments
-    });
-
-    return res.status(200).json(loop);
-
-} catch (error) {
-    console.error("Comment error:", error);
-    return res.status(500).json({ message: `Comment error: ${error.message}` });
-}
-
+};
 
 export const deleteComment = async (req, res) => {
     try {
+
         const { commentId } = req.params;
         const loopId = req.params.loopId;
 
         const loop = await Loop.findById(loopId);
+
         if (!loop) {
-            return res.status(400).json({ message: 'Loop Not found or already deleted' });
+            return res.status(400).json({
+                message: "Loop Not found or already deleted"
+            });
         }
 
-        const commentIndex = loop.comments.findIndex(comment => comment._id.toString() === commentId);
+        const commentIndex = loop.comments.findIndex(
+            comment => comment._id.toString() === commentId
+        );
+
         if (commentIndex === -1) {
-            return res.status(400).json({ message: 'Comment Not found or already deleted' });
+            return res.status(400).json({
+                message: "Comment Not found or already deleted"
+            });
         }
 
         const comment = loop.comments[commentIndex];
+
         if (comment.author.toString() !== req.userId.toString()) {
-            return res.status(400).json({ message: 'You are not authorized to delete this comment' });
+            return res.status(400).json({
+                message: "You are not authorized to delete this comment"
+            });
         }
 
         loop.comments.splice(commentIndex, 1);
+
         await loop.save();
+
         await loop.populate("author", "name userName profilePic");
         await loop.populate("comments.author", "name userName profilePic");
 
         return res.status(200).json(loop);
+
     } catch (error) {
         console.error("Delete comment error:", error);
-        return res.status(500).json({ message: `Delete comment error: ${error.message}` });
+        return res.status(500).json({
+            message: `Delete comment error: ${error.message}`
+        });
     }
 };
 
 export const deleteLoop = async (req, res) => {
-  try {
-    const { loopId } = req.params;
+    try {
 
-    console.log("DELETE REQUEST RECEIVED");
-    console.log("Loop ID:", loopId);
-    console.log("User ID:", req.userId);
+        const { loopId } = req.params;
 
-    const raw = await Loop.findOne({ _id: loopId });
-    console.log("RAW LOOP:", raw);
+        const raw = await Loop.findById(loopId);
 
-    if (!raw) {
-      return res.status(404).json({
-        message: "Loop not found in database",
-        loopId
-      });
+        if (!raw) {
+            return res.status(404).json({
+                message: "Loop not found in database"
+            });
+        }
+
+        if (raw.author.toString() !== req.userId.toString()) {
+            return res.status(403).json({
+                message: "You are not authorized to delete this loop"
+            });
+        }
+
+        await raw.deleteOne();
+
+        return res.status(200).json({
+            message: "Loop deleted successfully"
+        });
+
+    } catch (err) {
+        console.error("DELETE ERROR:", err);
+        return res.status(500).json({
+            message: err.message
+        });
     }
-
-    if (raw.author.toString() !== req.userId.toString()) {
-      return res.status(403).json({
-        message: "Author mismatch",
-        author: raw.author,
-        user: req.userId
-      });
-    }
-
-    await raw.deleteOne();
-
-    return res.status(200).json({ message: "Loop deleted successfully" });
-
-  } catch (err) {
-    console.error("DELETE ERROR:", err);
-    return res.status(500).json({ message: err.message });
-  }
 };
