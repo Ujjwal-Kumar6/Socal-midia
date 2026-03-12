@@ -39,16 +39,15 @@ function App() {
   const { userData, notification } = useSelector((state) => state.user);
   const { socket } = useSelector((state) => state.socket);
 
-  /* ---------------- USER LOAD ---------------- */
+  /* -------- USER LOAD -------- */
 
   useGetCurrentUser();
 
-  /* ---------------- DATA LOAD ---------------- */
+  /* -------- LOAD APP DATA -------- */
 
   useEffect(() => {
     if (!userData) return;
 
-    // run API calls in parallel
     Promise.all([
       getSuggestedUser(),
       useMyStory(),
@@ -56,17 +55,17 @@ function App() {
       getAllPost(),
       getAllLoop(),
       getPriviusUsers(),
-      getAllNotification()
+      getAllNotification(),
     ]);
   }, [userData]);
 
-  /* ---------------- SOCKET CONNECTION ---------------- */
+  /* -------- SOCKET CONNECTION -------- */
 
   useEffect(() => {
     if (!userData) return;
 
     const socketIo = io(url, {
-      query: { userId: userData._id }
+      query: { userId: userData._id },
     });
 
     dispatch(setSockets(socketIo));
@@ -78,19 +77,19 @@ function App() {
     return () => socketIo.close();
   }, [userData, dispatch]);
 
-  /* ---------------- NOTIFICATION SOCKET ---------------- */
+  /* -------- REALTIME NOTIFICATIONS -------- */
 
   useEffect(() => {
     if (!socket) return;
 
     socket.on("newNotification", (n) => {
-      dispatch(setNotification((prev) => [...prev, n]));
+      dispatch(setNotification([...notification, n]));
     });
 
     return () => socket.off("newNotification");
-  }, [socket, dispatch]);
+  }, [socket, notification, dispatch]);
 
-  /* ---------------- ROUTES ---------------- */
+  /* -------- ROUTES -------- */
 
   return (
     <Routes>
