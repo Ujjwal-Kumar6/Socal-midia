@@ -1,55 +1,78 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef, lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import io from "socket.io-client";
 
-import SingUp from "./pages/SingUp";
-import SingIn from "./pages/SingIn";
-import Home from "./pages/Home";
+// ─── Eager (tiny, always needed) ───────────────────────────────────────────
+import SingUp        from "./pages/SingUp";
+import SingIn        from "./pages/SingIn";
+import Home          from "./pages/Home";
 import ForgotPassword from "./pages/ForgotPassword";
-import Upload from "./pages/Uplod";
-import Profile from "./pages/profile";
-import Loop from "./pages/Loop";
-import Story from "./pages/Story";
-import EditProfile from "./pages/EditProfile";
-import Massage from "./componesnsts/Massage";
-import Conv from "./pages/Conv";
-import Surch from "./pages/Surch";
-import Notification from "./pages/Notification";
-import VideoCall from "./pages/VidioCall.jsx";
-import NotFound from "./pages/NotFound";
 
-import useGetCurrentUser from "./hooks/getCurrentUser";
-import getSuggestedUser from "./hooks/getSugestedUser";
-import getAllStory from "./hooks/getAllStory";
-import useMyStory from "./hooks/getMyStory";
-import getAllPost from "./hooks/getAllPost";
-import getAllLoop from "./hooks/getAllLoop";
-import getPriviusUsers from "./hooks/getPriviusUsers";
-import getAllNotification from "./hooks/getAllNotification";
+// ─── Lazy (split into separate chunks) ─────────────────────────────────────
+const Upload      = lazy(() => import("./pages/Uplod"));
+const Profile     = lazy(() => import("./pages/profile"));
+const Loop        = lazy(() => import("./pages/Loop"));
+const Story       = lazy(() => import("./pages/Story"));
+const EditProfile = lazy(() => import("./pages/EditProfile"));
+const Massage     = lazy(() => import("./componesnsts/Massage"));
+const Conv        = lazy(() => import("./pages/Conv"));
+const Surch       = lazy(() => import("./pages/Surch"));
+const Notification = lazy(() => import("./pages/Notification"));
+const VideoCall   = lazy(() => import("./pages/VidioCall.jsx"));
+const NotFound    = lazy(() => import("./pages/NotFound"));
 
+// ─── Hooks ──────────────────────────────────────────────────────────────────
+import useGetCurrentUser    from "./hooks/getCurrentUser";
+import getSuggestedUser     from "./hooks/getSugestedUser";
+import getAllStory           from "./hooks/getAllStory";
+import useMyStory           from "./hooks/getMyStory";
+import getAllPost            from "./hooks/getAllPost";
+import getAllLoop            from "./hooks/getAllLoop";
+import getPriviusUsers      from "./hooks/getPriviusUsers";
+import getAllNotification    from "./hooks/getAllNotification";
+
+// ─── Redux ──────────────────────────────────────────────────────────────────
 import { setOnlineUser, setSockets } from "./redux/socketSlice";
-import { setNotification } from "./redux/userSlice";
+import { setNotification }           from "./redux/userSlice";
 
 export const url = "https://vybe-backend-8yqs.onrender.com";
 
-function App() {
+// Reusable auth guards — avoids JSX duplication and re-renders
+const Private = ({ children }) => {
+  const userData = useSelector((s) => s.user.userData);
+  return userData ? children : <Navigate to="/singin" replace />;
+};
 
+const Guest = ({ children }) => {
+  const userData = useSelector((s) => s.user.userData);
+  return !userData ? children : <Navigate to="/" replace />;
+};
+
+// Minimal spinner shown while lazy chunks download
+const PageLoader = () => (
+  <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
+    <span style={{ fontSize: 24, opacity: 0.4 }}>Loading…</span>
+  </div>
+);
+
+function App() {
   const dispatch = useDispatch();
 
-  const { userData, notification } = useSelector((state) => state.user);
-  const { socket } = useSelector((state) => state.socket);
+  // Only subscribe to what we actually need
+  const userData     = useSelector((s) => s.user.userData);
+  const notification = useSelector((s) => s.user.notification);
+  const socket       = useSelector((s) => s.socket.socket);
 
-  /* -------- USER LOAD -------- */
+  // Stable ref so the notification listener never needs to be torn down/re-added
+  const notificationRef = useRef(notification);
+  useEffect(() => { notificationRef.current = notification; }, [notification]);
 
+  /* ─── Load current user ─────────────────────────────────────────────────── */
   useGetCurrentUser();
-
-  /* -------- HOOKS MUST BE AT TOP LEVEL -------- */
-
   useMyStory();
 
-  /* -------- LOAD APP DATA -------- */
-
+  /* ─── Load app data once userData is ready ──────────────────────────────── */
   useEffect(() => {
     if (!userData) return;
 
@@ -59,16 +82,17 @@ function App() {
     getAllLoop();
     getPriviusUsers();
     getAllNotification();
+  }, [userData?._id]); // depend on the ID, not the whole object — avoids extra calls
 
-  }, [userData]);
-
-  /* -------- SOCKET CONNECTION -------- */
-
+  /* ─── Socket connection ──────────────────────────────────────────────────── */
   useEffect(() => {
     if (!userData) return;
 
     const socketIo = io(url, {
       query: { userId: userData._id },
+      // Reconnection tuning — reduces unnecessary round-trips
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 5,
     });
 
     dispatch(setSockets(socketIo));
@@ -78,56 +102,42 @@ function App() {
     });
 
     return () => socketIo.close();
-  }, [userData, dispatch]);
+  }, [userData?._id, dispatch]); // stable dep — won't reconnect unless the user changes
 
-  /* -------- REALTIME NOTIFICATIONS -------- */
-
+  /* ─── Real-time notifications ────────────────────────────────────────────── */
   useEffect(() => {
     if (!socket) return;
 
-    socket.on("newNotification", (n) => {
-      dispatch(setNotification([...notification, n]));
-    });
+    // Use the ref so this effect never needs to re-run when notification changes
+    const handler = (n) => {
+      dispatch(setNotification([...notificationRef.current, n]));
+    };
 
-    return () => socket.off("newNotification");
-  }, [socket, notification, dispatch]);
+    socket.on("newNotification", handler);
+    return () => socket.off("newNotification", handler);
+  }, [socket, dispatch]); // ← notification removed from deps — no more listener thrash
 
-  /* -------- ROUTES -------- */
-
+  /* ─── Routes ─────────────────────────────────────────────────────────────── */
   return (
-    <Routes>
-
-      <Route path="/" element={userData ? <Home /> : <Navigate to="/singin" replace />} />
-
-      <Route path="/singup" element={!userData ? <SingUp /> : <Navigate to="/" replace />} />
-
-      <Route path="/singin" element={!userData ? <SingIn /> : <Navigate to="/" replace />} />
-
-      <Route path="/resetpassword" element={!userData ? <ForgotPassword /> : <Navigate to="/" replace />} />
-
-      <Route path="/uplod" element={userData ? <Upload /> : <Navigate to="/singin" replace />} />
-
-      <Route path="/profile/:userName" element={userData ? <Profile /> : <Navigate to="/singin" replace />} />
-
-      <Route path="/loop" element={userData ? <Loop /> : <Navigate to="/singin" replace />} />
-
-      <Route path="/story/:userName" element={userData ? <Story /> : <Navigate to="/singin" replace />} />
-
-      <Route path="/editprofile" element={userData ? <EditProfile /> : <Navigate to="/singin" replace />} />
-
-      <Route path="/massage" element={userData ? <Massage /> : <Navigate to="/singin" replace />} />
-
-      <Route path="/conv" element={userData ? <Conv /> : <Navigate to="/singin" replace />} />
-
-      <Route path="/search" element={userData ? <Surch /> : <Navigate to="/singin" replace />} />
-
-      <Route path="/notification" element={userData ? <Notification /> : <Navigate to="/singin" replace />} />
-
-      <Route path="/video-call" element={userData ? <VideoCall /> : <Navigate to="/singin" replace />} />
-
-      <Route path="*" element={userData ? <NotFound /> : <Navigate to="/singin" replace />} />
-
-    </Routes>
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+        <Route path="/"               element={<Private><Home /></Private>} />
+        <Route path="/singup"         element={<Guest><SingUp /></Guest>} />
+        <Route path="/singin"         element={<Guest><SingIn /></Guest>} />
+        <Route path="/resetpassword"  element={<Guest><ForgotPassword /></Guest>} />
+        <Route path="/uplod"          element={<Private><Upload /></Private>} />
+        <Route path="/profile/:userName" element={<Private><Profile /></Private>} />
+        <Route path="/loop"           element={<Private><Loop /></Private>} />
+        <Route path="/story/:userName" element={<Private><Story /></Private>} />
+        <Route path="/editprofile"    element={<Private><EditProfile /></Private>} />
+        <Route path="/massage"        element={<Private><Massage /></Private>} />
+        <Route path="/conv"           element={<Private><Conv /></Private>} />
+        <Route path="/search"         element={<Private><Surch /></Private>} />
+        <Route path="/notification"   element={<Private><Notification /></Private>} />
+        <Route path="/video-call"     element={<Private><VideoCall /></Private>} />
+        <Route path="*"               element={<Private><NotFound /></Private>} />
+      </Routes>
+    </Suspense>
   );
 }
 
