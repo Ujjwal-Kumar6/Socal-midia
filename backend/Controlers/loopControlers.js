@@ -114,7 +114,7 @@ export const like = async (req, res) => {
     }
 };
 
-export const commentLoop = async (req, res) => {
+export const comment = async (req, res) => {
     try {
 
         const { message } = req.body;
